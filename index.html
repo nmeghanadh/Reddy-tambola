@@ -102,20 +102,25 @@ input[type=text],input[type=url],select{width:100%;min-height:42px;padding:8px 1
 <main id="s-setup" class="screen active">
   <div class="card" style="display:flex;flex-direction:column;gap:12px;margin:auto 0">
     <h2 style="text-align:center">Reddy Tambola Live</h2>
-    <p style="text-align:center;color:var(--mut);font-size:.8rem">50 Players • Fireworks • Live Chat • YouTube Sync</p>
+    <p style="text-align:center;color:var(--mut);font-size:.8rem">50 Players • Auto-Save Resume • Fireworks • Live Chat</p>
     <div><label style="font-size:.75rem;color:var(--mut);font-weight:700">YOUR NAME</label><input type="text" id="in-name" placeholder="Enter your name" maxlength="16" style="margin-top:4px"/></div>
     <div><label style="font-size:.75rem;color:var(--mut);font-weight:700">ROOM CODE</label>
       <div class="row" style="margin-top:4px"><input type="text" id="in-room" placeholder="CODE" maxlength="4" style="text-transform:uppercase;font-weight:800;text-align:center;letter-spacing:2px"/><button id="btn-join" class="btn-pri" style="min-width:110px">Join Game</button></div>
     </div>
     <div style="text-align:center;color:var(--mut);font-size:.75rem">— OR —</div>
     <button id="btn-host" class="btn-acc">👑 Create Room as Host (50 Players)</button>
+    <button id="btn-resume-host" class="btn-ok" style="display:none">🔄 Resume Hosting Previous Room</button>
   </div>
 </main>
 
 <main id="s-host" class="screen">
   <div class="card">
     <div class="title"><span>Room: <strong id="h-code" style="color:var(--acc);font-size:1rem">----</strong></span><span id="h-cnt">0 / 50 Players</span></div>
-    <div class="row" style="margin-bottom:8px"><button id="btn-copy" class="btn-pri btn-sm grow">🔗 Share / Copy Invite</button><button id="btn-hgrid" class="btn-out btn-sm">1-90 Grid</button></div>
+    <div class="row" style="margin-bottom:8px">
+      <button id="btn-copy" class="btn-pri btn-sm grow">🔗 Share Invite</button>
+      <button id="btn-hgrid" class="btn-out btn-sm">1-90 Grid</button>
+      <button id="btn-report" class="btn-ok btn-sm">📄 Report</button>
+    </div>
     <div class="chips" id="h-players"><span style="font-size:.76rem;color:var(--mut)">Waiting for players...</span></div>
   </div>
   <div class="caller">
@@ -141,7 +146,7 @@ input[type=text],input[type=url],select{width:100%;min-height:42px;padding:8px 1
     <div class="ball" id="p-ball">--</div>
     <div style="flex:1;margin-left:10px"><div class="row" style="justify-content:space-between"><span style="font-size:.72rem;color:var(--mut);font-weight:700">LAST CALLED</span><span id="p-ccnt" style="font-size:.72rem;color:var(--acc);font-weight:700">0/90</span></div><div class="recent" id="p-rec"></div></div>
   </div>
-  <div class="twrap"><div class="thead"><span id="t-name">TICKET</span><span style="font-size:.68rem;color:#475569">Tap numbers manually • Auto-Claim ⚡</span></div><div class="tgrid" id="p-tgrid"></div></div>
+  <div class="twrap"><div class="thead"><span id="t-name">TICKET</span><span style="font-size:.68rem;color:#475569">Auto-Saved • Tap numbers manually ⚡</span></div><div class="tgrid" id="p-tgrid"></div></div>
   <div class="card"><div class="title"><span>🏆 Live Winners Board</span><button id="btn-pgrid" class="btn-out btn-sm" style="min-height:26px;padding:2px 8px">1-90 Board</button></div><div class="pgrid" id="p-pgrid"></div></div>
   <div class="card" id="p-bcard" style="display:none"><div class="title">1–90 Called Numbers</div><div class="bgrid" id="p-bgrid"></div></div>
 </main>
@@ -177,33 +182,48 @@ input[type=text],input[type=url],select{width:100%;min-height:42px;padding:8px 1
 const MAX_PLAYERS=50;
 const PEER_CFG={config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'stun:stun2.l.google.com:19302'}]}};
 const PRIZES=[{id:'early5',name:'Early 5',icon:'⚡'},{id:'topLine',name:'Top Line',icon:'⬆️'},{id:'middleLine',name:'Middle Line',icon:'↔️'},{id:'bottomLine',name:'Bottom Line',icon:'⬇️'},{id:'fourCorners',name:'Four Corners',icon:'四角'},{id:'fullHouse',name:'Full House',icon:'👑'}];
-const st={role:null,code:'',name:'',peer:null,hconn:null,peers:new Map(),called:[],curr:null,prizes:{},ticket:null,dab:new Set(),timer:null,fileBuf:null,fileMime:'',mMode:'none',ytId:'',ytPlaying:false,unread:0};
+const st={role:null,code:'',name:'',peer:null,hconn:null,peers:new Map(),allPlayers:new Set(),called:[],curr:null,prizes:{},ticket:null,dab:new Set(),timer:null,fileBuf:null,fileMime:'',mMode:'none',ytId:'',ytPlaying:false,unread:0};
 PRIZES.forEach(p=>st.prizes[p.id]={won:false,winner:null,num:null});
 const $=id=>document.getElementById(id);
+
+/* LocalStorage Auto-Save & Recovery */
+function savePlayerState(){
+  if(st.role!=='player'||!st.code)return;
+  try{localStorage.setItem('RTAMBOLA_P_'+st.code,JSON.stringify({name:st.name,ticket:st.ticket,dab:[...st.dab]}));}catch(e){}
+}
+function loadPlayerState(code){
+  try{
+    const raw=localStorage.getItem('RTAMBOLA_P_'+code);if(!raw)return false;
+    const d=JSON.parse(raw);
+    if(d&&d.ticket){
+      st.ticket=d.ticket;st.dab=new Set(d.dab||[]);
+      if(d.name&&!$('in-name').value.trim())$('in-name').value=d.name;
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+function saveHostState(){
+  if(st.role!=='host'||!st.code)return;
+  try{localStorage.setItem('RTAMBOLA_HOST_LAST',JSON.stringify({code:st.code,name:st.name,called:st.called,curr:st.curr,prizes:st.prizes,allPlayers:[...st.allPlayers]}));}catch(e){}
+}
 
 function extractYtId(u){
   const m=u.match(/(?:youtu\.be\/|youtube\.com\/(?:.*v=|.*\/|embed\/|shorts\/|live\/))([^"&?\/\s]{11})/);
   return m?m[1]:null;
 }
-
 function ytCmd(func,args=[]){
   const f=$('yt-frame');
   if(f&&f.contentWindow)f.contentWindow.postMessage(JSON.stringify({event:'command',func,args}),'*');
 }
-
 function mountYtIframe(id,play=true){
   st.mMode='yt';st.ytId=id;st.ytPlaying=play;
   $('mdock').classList.add('vis');
   $('svid').pause();$('svid').style.display='none';
-  const yf=$('yt-frame');
-  yf.style.display='block';
+  const yf=$('yt-frame');yf.style.display='block';
   const targetSrc=`https://www.youtube.com/embed/${id}?enablejsapi=1&autoplay=${play?1:0}&playsinline=1&rel=0`;
-  if(yf.dataset.vid!==id){
-    yf.dataset.vid=id;
-    yf.src=targetSrc;
-  }else{
-    ytCmd(play?'playVideo':'pauseVideo');
-  }
+  if(yf.dataset.vid!==id){yf.dataset.vid=id;yf.src=targetSrc;}
+  else ytCmd(play?'playVideo':'pauseVideo');
   if(st.role==='player'&&play)$('unlock').classList.add('active');
 }
 
@@ -276,7 +296,7 @@ function renderTicket(){
       el.onclick=()=>{
         if(!cset.has(n)){el.classList.add('err');setTimeout(()=>el.classList.remove('err'),350);return;}
         st.dab.has(n)?st.dab.delete(n):st.dab.add(n);
-        renderTicket();checkPlayerAutoClaim();
+        savePlayerState();renderTicket();checkPlayerAutoClaim();
       };
     }
     g.appendChild(el);
@@ -347,7 +367,6 @@ function receiveChat(sender,text){
     st.unread++;$('chat-badge').style.display='inline';$('chat-badge').textContent=st.unread;
   }
 }
-
 function sendChatMsg(txt){
   if(!txt)return;
   const msg={type:'CHAT',sender:st.name||'Player',text:txt};
@@ -368,14 +387,18 @@ function verifyHostClaim(peerId,pid,playerDabs){
   if(evalPrizes(p.ticket,verifiedSet).includes(pid)){
     pr.won=true;pr.winner=p.name;pr.num=st.curr||0;
     const pname=PRIZES.find(x=>x.id===pid).name;
-    renderUI();celebrate(pname,p.name,pr.num,pid);
+    saveHostState();renderUI();celebrate(pname,p.name,pr.num,pid);
     bcast({type:'AWARD',pid,pname,winner:p.name,num:pr.num,prizes:st.prizes});
   }
 }
 
-$('btn-host').onclick=()=>{
-  st.role='host';st.name=$('in-name').value.trim()||'Host';
-  st.code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
+function startHostSession(isResume=false){
+  st.role='host';
+  if(!isResume){
+    st.name=$('in-name').value.trim()||'Host';
+    st.code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
+    saveHostState();
+  }
   st.peer=new Peer('RTAMBOLA_'+st.code,PEER_CFG);
   st.peer.on('open',()=>{
     $('nstat').textContent='Host ('+st.code+')';$('ndot').classList.add('online');$('h-code').textContent=st.code;$('rbadge').style.display='inline';$('rbadge').textContent=st.code;
@@ -388,6 +411,7 @@ $('btn-host').onclick=()=>{
     conn.on('data',d=>{
       if(d.type==='JOIN'){
         st.peers.set(conn.peer,{conn,name:d.name,ticket:d.ticket});
+        st.allPlayers.add(d.name);saveHostState();
         conn.send({type:'SYNC',called:st.called,curr:st.curr,prizes:st.prizes,media:mState()});
         if(st.mMode==='file'&&st.fileBuf)sendFileToPeer(conn);
         updLobby();
@@ -397,6 +421,13 @@ $('btn-host').onclick=()=>{
     });
     conn.on('close',()=>{st.peers.delete(conn.peer);updLobby();});
   });
+}
+
+$('btn-host').onclick=()=>startHostSession(false);$('btn-resume-host').onclick=()=>{
+  try{
+    const d=JSON.parse(localStorage.getItem('RTAMBOLA_HOST_LAST'));
+    if(d&&d.code){st.code=d.code;st.name=d.name||'Host';st.called=d.called||[];st.curr=d.curr||null;st.prizes=d.prizes||st.prizes;st.allPlayers=new Set(d.allPlayers||[]);startHostSession(true);}
+  }catch(e){}
 };
 
 function updLobby(){
@@ -413,11 +444,12 @@ function connectToHost(code){
     $('nstat').textContent='Connected';$('ndot').classList.add('online');$('rbadge').style.display='inline';$('rbadge').textContent=code;$('t-name').textContent=st.name.toUpperCase()+"'S TICKET";
     $('btn-chat-open').style.display='inline-flex';
     conn.send({type:'JOIN',name:st.name,ticket:st.ticket});
-    $('s-setup').classList.remove('active');$('s-player').classList.add('active');renderUI();
+    $('s-setup').classList.remove('active');$('s-player').classList.add('active');
+    renderUI();checkPlayerAutoClaim();
   });
   conn.on('data',d=>{
     if(d.type==='FULL'){alert('Room is full (50 players max)');location.reload();}
-    if(d.type==='SYNC'){st.called=d.called;st.curr=d.curr;st.prizes=d.prizes;renderUI();if(d.media&&d.media.mode!=='none')syncMedia(d.media);}
+    if(d.type==='SYNC'){st.called=d.called;st.curr=d.curr;st.prizes=d.prizes;renderUI();checkPlayerAutoClaim();if(d.media&&d.media.mode!=='none')syncMedia(d.media);}
     if(d.type==='CALL'){st.curr=d.num;st.called=d.called;renderUI();}
     if(d.type==='AWARD'){st.prizes=d.prizes;renderUI();celebrate(d.pname,d.winner,d.num,d.pid);}
     if(d.type==='CHAT')receiveChat(d.sender,d.text);
@@ -435,9 +467,12 @@ function connectToHost(code){
 
 $('btn-join').onclick=()=>{
   const code=$('in-room').value.trim().toUpperCase();if(code.length!==4)return alert('Enter 4-letter Room Code');
-  st.role='player';st.name=$('in-name').value.trim()||'Player';st.code=code;
-  if(!st.ticket)st.ticket=genTicket();
-  $('btn-join').textContent='Joining...';
+  st.role='player';st.code=code;
+  const restored=loadPlayerState(code);
+  st.name=$('in-name').value.trim()||'Player';
+  if(!restored||!st.ticket)st.ticket=genTicket();
+  savePlayerState();
+  $('btn-join').textContent=restored?'Resuming...':'Joining...';
   if(!st.peer){
     st.peer=new Peer(PEER_CFG);
     st.peer.on('open',()=>connectToHost(code));
@@ -451,16 +486,54 @@ function callNext(){
   if(st.called.length>=90)return;
   const cset=new Set(st.called),rem=[];for(let i=1;i<=90;i++)if(!cset.has(i))rem.push(i);
   const next=rem[Math.floor(Math.random()*rem.length)];
-  st.called.push(next);st.curr=next;renderUI();
+  st.called.push(next);st.curr=next;saveHostState();renderUI();
   bcast({type:'CALL',num:next,called:st.called});
 }
 $('btn-call').onclick=callNext;
 $('sel-auto').onchange=e=>{clearInterval(st.timer);const ms=+e.target.value;if(ms){callNext();st.timer=setInterval(callNext,ms);}};$('btn-copy').onclick=()=>{
   const url=location.origin+location.pathname+'?room='+st.code;
   if(navigator.share){navigator.share({title:'Join Reddy Tambola Live',text:`Join my Tambola room (${st.code})!`,url}).catch(()=>{});}
-  else{navigator.clipboard.writeText(url);$('btn-copy').textContent='✅ Copied!';setTimeout(()=>$('btn-copy').textContent='🔗 Share / Copy Invite',2000);}
+  else{navigator.clipboard.writeText(url);$('btn-copy').textContent='✅ Copied!';setTimeout(()=>$('btn-copy').textContent='🔗 Share Invite',2000);}
 };
 $('btn-hgrid').onclick=()=>$('h-bcard').style.display=$('h-bcard').style.display==='none'?'block':'none';$('btn-pgrid').onclick=()=>$('p-bcard').style.display=$('p-bcard').style.display==='none'?'block':'none';
+
+/* Final Match Report Generator */
+$('btn-report').onclick=()=>{
+  const prizeLines=PRIZES.map(p=>{
+    const pr=st.prizes[p.id];
+    return `• ${p.name.padEnd(14)}: ${pr.won?`${pr.winner} (Won on Call #${pr.num})`:'Unclaimed'}`;
+  }).join('\n');
+  const plist=[...st.allPlayers].map((n,i)=>`${i+1}. ${n}`).join('\n')||'None recorded';
+  const txt=`=====================================================
+       🎱 REDDY TAMBOLA LIVE — FINAL MATCH REPORT
+=====================================================
+Room Code     : ${st.code}
+Host Name     : ${st.name}
+Total Players : ${st.allPlayers.size} (Currently Online: ${st.peers.size})
+Numbers Called: ${st.called.length} / 90
+Date & Time   : ${new Date().toLocaleString()}
+
+-----------------------------------------------------
+🏆 PRIZE WINNERS SUMMARY
+-----------------------------------------------------
+${prizeLines}
+
+-----------------------------------------------------
+🔢 CALLED NUMBERS (Chronological Order)
+-----------------------------------------------------
+${st.called.join(', ')||'None'}
+
+-----------------------------------------------------
+👥 PARTICIPANTS ROSTER (${st.allPlayers.size})
+-----------------------------------------------------
+${plist}
+=====================================================`;
+  const blob=new Blob([txt],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`Tambola_Report_${st.code}.txt`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+};
 
 const svid=$('svid');
 function mState(){
@@ -468,24 +541,13 @@ function mState(){
   return{type:'MEDIA',mode:st.mMode,url:svid.dataset.url||'',play:!svid.paused,time:svid.currentTime||0};
 }
 function playVid(){
-  if(st.mMode==='yt'){
-    st.ytPlaying=true;
-    ytCmd('unMute');ytCmd('setVolume',[100]);ytCmd('playVideo');
-    $('unlock').classList.remove('active');
-    return;
-  }
+  if(st.mMode==='yt'){st.ytPlaying=true;ytCmd('unMute');ytCmd('setVolume',[100]);ytCmd('playVideo');$('unlock').classList.remove('active');return;}
   svid.muted=false;svid.play().then(()=>$('unlock').classList.remove('active')).catch(()=>$('unlock').classList.add('active'));
 }
-function pauseVid(){
-  if(st.mMode==='yt'){st.ytPlaying=false;ytCmd('pauseVideo');return;}
-  svid.pause();
-}
+function pauseVid(){if(st.mMode==='yt'){st.ytPlaying=false;ytCmd('pauseVideo');return;}svid.pause();}
 function syncMedia(m){
   $('mdock').classList.add('vis');
-  if(m.mode==='yt'&&m.ytId){
-    mountYtIframe(m.ytId,m.play);
-    return;
-  }
+  if(m.mode==='yt'&&m.ytId){mountYtIframe(m.ytId,m.play);return;}
   $('yt-frame').style.display='none';$('yt-frame').src='';$('yt-frame').dataset.vid='';$('svid').style.display='block';
   if(m.url&&m.url!=='local_blob'&&svid.dataset.url!==m.url){svid.srcObject=null;svid.src=m.url;svid.dataset.url=m.url;}
   if(Math.abs((svid.currentTime||0)-(m.time||0))>.8)svid.currentTime=m.time||0;
@@ -494,13 +556,7 @@ function syncMedia(m){
 $('btn-url').onclick=()=>{
   const u=$('in-url').value.trim();if(!u)return;
   const ytId=extractYtId(u);
-  if(ytId){
-    st.fileBuf=null;
-    mountYtIframe(ytId,true);
-    $('m-status').textContent='YouTube Loaded ✅';
-    bcast(mState());
-    return;
-  }
+  if(ytId){st.fileBuf=null;mountYtIframe(ytId,true);$('m-status').textContent='YouTube Loaded ✅';bcast(mState());return;}
   st.mMode='url';st.fileBuf=null;
   $('yt-frame').style.display='none';$('yt-frame').src='';$('yt-frame').dataset.vid='';$('svid').style.display='block';svid.srcObject=null;svid.src=u;svid.dataset.url=u;
   $('mdock').classList.add('vis');playVid();$('m-status').textContent='URL Synced ✅';
@@ -521,7 +577,16 @@ $('mhead').onclick=()=>$('mdock').classList.toggle('min');
 window.onload=()=>{
   for(let i=1;i<=90;i++){$('h-bgrid').innerHTML+=`<div class="bcell" id="hc-${i}">${i}</div>`;$('p-bgrid').innerHTML+=`<div class="bcell" id="pc-${i}">${i}</div>`;}
   renderUI();
-  const r=new URLSearchParams(location.search).get('room');if(r)$('in-room').value=r.toUpperCase().slice(0,4);
+  const r=new URLSearchParams(location.search).get('room');
+  if(r){
+    const code=r.toUpperCase().slice(0,4);
+    $('in-room').value=code;
+    loadPlayerState(code);
+  }
+  try{
+    const hd=JSON.parse(localStorage.getItem('RTAMBOLA_HOST_LAST'));
+    if(hd&&hd.code){$('btn-resume-host').style.display='inline-flex';$('btn-resume-host').textContent=`🔄 Resume Hosting Room (${hd.code})`;}
+  }catch(e){}
 };
 </script>
 </body>
