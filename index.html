@@ -1,578 +1,296 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Tambola Live - 20 Player Multiplayer</title>
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-  <style>
-    :root {
-      --bg-dark: #0f172a;
-      --bg-card: #1e293b;
-      --bg-panel: #334155;
-      --accent: #f59e0b;
-      --accent-hover: #d97706;
-      --primary: #3b82f6;
-      --success: #10b981;
-      --danger: #ef4444;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --border: #475569;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      user-select: none;
-      -webkit-user-select: none;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: var(--bg-dark);
-      color: var(--text-main);
-      width: 100vw;
-      height: 100dvh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* Confetti Canvas */
-    #confetti-canvas {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 9999;
-    }
-
-    /* Celebration Banner */
-    #celebration-banner {
-      position: fixed;
-      top: 16px;
-      left: 50%;
-      transform: translateX(-50%) translateY(-150%);
-      width: 92%;
-      max-width: 440px;
-      background: linear-gradient(135deg, #f59e0b, #ec4899);
-      color: #fff;
-      padding: 16px 20px;
-      border-radius: 16px;
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
-      z-index: 9998;
-      text-align: center;
-      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-      border: 2px solid rgba(255, 255, 255, 0.4);
-    }
-
-    #celebration-banner.active {
-      transform: translateX(-50%) translateY(0);
-    }
-
-    #celebration-banner h3 {
-      font-size: 1.25rem;
-      font-weight: 800;
-      margin-bottom: 4px;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    }
-
-    #celebration-banner p {
-      font-size: 0.95rem;
-      font-weight: 600;
-      opacity: 0.95;
-    }
-
-    /* Header */
-    header {
-      background-color: var(--bg-card);
-      border-bottom: 1px solid var(--border);
-      padding: 10px 14px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-shrink: 0;
-      z-index: 20;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-weight: 800;
-      font-size: 1.1rem;
-      color: var(--accent);
-    }
-
-    .status-badge {
-      font-size: 0.75rem;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: var(--bg-panel);
-      color: var(--text-muted);
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--accent);
-    }
-
-    .status-dot.online {
-      background: var(--success);
-      box-shadow: 0 0 8px var(--success);
-    }
-
-    /* Main Screens */
-    .screen {
-      display: none;
-      flex: 1;
-      overflow-y: auto;
-      padding: 14px;
-      gap: 14px;
-      flex-direction: column;
-      max-width: 600px;
-      width: 100%;
-      margin: 0 auto;
-    }
-
-    .screen.active {
-      display: flex;
-    }
-
-    /* Cards & Containers */
-    .card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 14px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    }
-
-    .card-title {
-      font-size: 0.85rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-muted);
-      font-weight: 700;
-      margin-bottom: 10px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    /* Buttons & Inputs */
-    button {
-      min-height: 44px;
-      padding: 10px 16px;
-      border-radius: 10px;
-      border: none;
-      font-size: 0.95rem;
-      font-weight: 700;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: transform 0.1s, background-color 0.2s, opacity 0.2s;
-    }
-
-    button:active:not(:disabled) {
-      transform: scale(0.97);
-    }
-
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .btn-primary {
-      background: var(--primary);
-      color: white;
-    }
-
-    .btn-accent {
-      background: var(--accent);
-      color: #0f172a;
-    }
-
-    .btn-success {
-      background: var(--success);
-      color: white;
-    }
-
-    .btn-danger {
-      background: var(--danger);
-      color: white;
-    }
-
-    .btn-outline {
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text-main);
-    }
-
-    .btn-sm {
-      min-height: 36px;
-      padding: 6px 12px;
-      font-size: 0.8rem;
-    }
-
-    input[type="text"], input[type="url"], select {
-      width: 100%;
-      min-height: 44px;
-      padding: 10px 14px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--bg-dark);
-      color: var(--text-main);
-      font-size: 1rem;
-      outline: none;
-    }
-
-    input[type="text"]:focus, input[type="url"]:focus {
-      border-color: var(--accent);
-    }
-
-    /* Prize Configuration Selector Chips */
-    .prize-selector-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-    }
-
-    .prize-toggle-btn {
-      min-height: 44px;
-      padding: 8px 10px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--bg-dark);
-      color: var(--text-muted);
-      font-size: 0.82rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      text-align: left;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .prize-toggle-btn.selected {
-      border-color: var(--accent);
-      background: rgba(245, 158, 11, 0.15);
-      color: var(--text-main);
-    }
-
-    .prize-toggle-btn.locked {
-      opacity: 0.65;
-      cursor: not-allowed;
-    }
-
-    .check-box {
-      width: 18px;
-      height: 18px;
-      border-radius: 5px;
-      border: 2px solid var(--text-muted);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.7rem;
-      flex-shrink: 0;
-    }
-
-    .prize-toggle-btn.selected .check-box {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #0f172a;
-    }
-
-    /* Landing / Setup Screen */
-    .setup-box {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-top: auto;
-      margin-bottom: auto;
-    }
-
-    .divider {
-      display: flex;
-      align-items: center;
-      text-align: center;
-      color: var(--text-muted);
-      font-size: 0.8rem;
-      margin: 8px 0;
-    }
-
-    .divider::before, .divider::after {
-      content: '';
-      flex: 1;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .divider:not(:empty)::before { margin-right: 10px; }
-    .divider:not(:empty)::after { margin-left: 10px; }
-
-    /* Caller Display Banner */
-    .caller-banner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: linear-gradient(135deg, #1e293b, #0f172a);
-      border: 2px solid var(--accent);
-      border-radius: 16px;
-      padding: 12px 16px;
-    }
-
-    .current-ball {
-      width: 68px;
-      height: 68px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 30% 30%, #fbbf24, #d97706);
-      color: #0f172a;
-      font-size: 2rem;
-      font-weight: 900;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
-      flex-shrink: 0;
-    }
-
-    .caller-info {
-      flex: 1;
-      margin-left: 14px;
-    }
-
-    .recent-balls {
-      display: flex;
-      gap: 6px;
-      margin-top: 6px;
-      flex-wrap: wrap;
-    }
-
-    .mini-ball {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: var(--bg-panel);
-      color: var(--text-main);
-      font-size: 0.78rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* 1-90 Board Grid */
-    .board-grid {
-      display: grid;
-      grid-template-columns: repeat(10, 1fr);
-      gap: 4px;
-    }
-
-    .board-cell {
-      aspect-ratio: 1;
-      border-radius: 6px;
-      background: var(--bg-dark);
-      color: var(--text-muted);
-      font-size: 0.75rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      transition: all 0.2s;
-    }
-
-    .board-cell.called {
-      background: var(--accent);
-      color: #0f172a;
-      border-color: #fff;
-      font-weight: 900;
-    }
-
-    .board-cell.latest {
-      background: var(--success);
-      color: #fff;
-      transform: scale(1.1);
-      z-index: 2;
-      box-shadow: 0 0 10px var(--success);
-    }
-
-    /* Tambola 3x9 Ticket */
-    .ticket-wrapper {
-      background: #f8fafc;
-      border-radius: 14px;
-      padding: 10px;
-      border: 4px solid var(--accent);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-    }
-
-    .ticket-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      color: #0f172a;
-      font-weight: 800;
-      font-size: 0.85rem;
-      margin-bottom: 8px;
-      padding: 0 4px;
-    }
-
-    .ticket-grid {
-      display: grid;
-      grid-template-columns: repeat(9, 1fr);
-      grid-template-rows: repeat(3, 1fr);
-      gap: 4px;
-      background: #cbd5e1;
-      padding: 4px;
-      border-radius: 8px;
-    }
-
-    .ticket-cell {
-      min-height: 48px;
-      background: #ffffff;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.05rem;
-      font-weight: 800;
-      color: #1e293b;
-      position: relative;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-
-    .ticket-cell.empty {
-      background: #e2e8f0;
-      cursor: default;
-    }
-
-    .ticket-cell.called-hint::after {
-      content: '';
-      position: absolute;
-      top: 4px;
-      right: 4px;
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--primary);
-    }
-
-    .ticket-cell.dabbed {
-      background: #dcfce7;
-      color: #15803d;
-    }
-
-    .ticket-cell.dabbed::before {
-      content: '';
-      position: absolute;
-      width: 34px;
-      height: 34px;
-      border-radius: 50%;
-      background: rgba(16, 185, 129, 0.35);
-      border: 2px solid #10b981;
-      pointer-events: none;
-    }
-
-    /* Winners Board */
-    .prizes-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-    }
-
-    .prize-card {
-      background: var(--bg-dark);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 8px 10px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-
-    .prize-card.won {
-      border-color: var(--success);
-      background: rgba(16, 185, 129, 0.1);
-    }
-
-    .prize-name {
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: var(--text-main);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .prize-desc {
-      font-size: 0.68rem;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    .prize-winner {
-      font-size: 0.75rem;
-      color: var(--accent);
-      font-weight: 700;
-      margin-top: 4px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .prize-card:not(.won) .prize-winner {
-      color: var(--text-muted);
-      font-weight: 500;
-    }
-
-    /* Player Chips in Host Lobby */
-    .players-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    .player-chip {
-      background: var(--bg-panel);
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    /* Floating / Dockable Media Player */
-    #media-dock {
-      position: fixed;
-      bottom: 12px;
-      right: 12px;
-      width: 270px;
-      background: var(--bg-card);
-      border: 2px solid var(--primary);
-      border-radius: 14px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.65);
-      z-index: 1000;
-      overflow: hidden;
-      display: none;
-      flex-direction: column;
-      transition: height 0.25s ease, width 0.25s ease;
-    }
-
-    #media
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+<title>Tambola Live - 20 Player</title>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--panel:#334155;--acc:#f59e0b;--pri:#3b82f6;--ok:#10b981;--txt:#f8fafc;--mut:#94a3b8;--brd:#475569}
+*{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--txt);width:100vw;height:100dvh;overflow:hidden;display:flex;flex-direction:column}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:9999}
+#banner{position:fixed;top:16px;left:50%;transform:translate(-50%,-160%);width:92%;max-width:420px;background:linear-gradient(135deg,#f59e0b,#ec4899);color:#fff;padding:14px 18px;border-radius:14px;box-shadow:0 10px 25px rgba(0,0,0,.6);z-index:9998;text-align:center;transition:.35s;border:2px solid #fff6}
+#banner.active{transform:translate(-50%,0)}
+header{background:var(--card);border-bottom:1px solid var(--brd);padding:10px 14px;display:flex;align-items:center;justify-content:space-between}
+.brand{font-weight:800;font-size:1.05rem;color:var(--acc);display:flex;gap:8px;align-items:center}
+.badge{font-size:.75rem;padding:4px 10px;border-radius:99px;background:var(--panel);color:var(--mut);font-weight:600;display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--acc)}.dot.online{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.screen{display:none;flex:1;overflow-y:auto;padding:12px;gap:12px;flex-direction:column;max-width:560px;width:100%;margin:0 auto}.screen.active{display:flex}
+.card{background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:12px}
+.title{font-size:.8rem;text-transform:uppercase;color:var(--mut);font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+button{min-height:44px;padding:8px 14px;border-radius:10px;border:none;font-size:.9rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+button:active{transform:scale(.97)}
+.btn-pri{background:var(--pri);color:#fff}.btn-acc{background:var(--acc);color:#0f172a}.btn-ok{background:var(--ok);color:#fff}.btn-out{background:transparent;border:1px solid var(--brd);color:var(--txt)}.btn-sm{min-height:34px;padding:4px 10px;font-size:.78rem}
+input[type=text],input[type=url],select{width:100%;min-height:44px;padding:8px 12px;border-radius:10px;border:1px solid var(--brd);background:var(--bg);color:var(--txt);font-size:.95rem}
+.row{display:flex;gap:8px;align-items:center}.grow{flex:1}
+.caller{display:flex;align-items:center;justify-content:space-between;background:var(--card);border:2px solid var(--acc);border-radius:14px;padding:10px 14px}
+.ball{width:62px;height:62px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#fbbf24,#d97706);color:#0f172a;font-size:1.85rem;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.recent{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap}
+.mball{width:26px;height:26px;border-radius:50%;background:var(--panel);font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center}
+.bgrid{display:grid;grid-template-columns:repeat(10,1fr);gap:3px}
+.bcell{aspect-ratio:1;border-radius:5px;background:var(--bg);color:var(--mut);font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center}
+.bcell.called{background:var(--acc);color:#0f172a;font-weight:900}.bcell.latest{background:var(--ok);color:#fff;transform:scale(1.1)}
+.twrap{background:#f8fafc;border-radius:12px;padding:8px;border:3px solid var(--acc)}
+.thead{display:flex;justify-content:space-between;color:#0f172a;font-weight:800;font-size:.8rem;margin-bottom:6px}
+.tgrid{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;background:#cbd5e1;padding:3px;border-radius:6px}
+.tcell{min-height:46px;background:#fff;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:800;color:#1e293b;position:relative;cursor:pointer}
+.tcell.empty{background:#e2e8f0;cursor:default}
+.tcell.hint::after{content:'';position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--pri)}
+.tcell.dab{background:#dcfce7;color:#15803d}.tcell.dab::before{content:'';position:absolute;width:32px;height:32px;border-radius:50%;background:#10b98144;border:2px solid #10b981}
+.pgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.pcard{background:var(--bg);border:1px solid var(--brd);border-radius:8px;padding:7px 9px}
+.pcard.won{border-color:var(--ok);background:#10b9811a}
+.pname{font-size:.78rem;font-weight:700;display:flex;justify-content:space-between}
+.pwin{font-size:.72rem;color:var(--acc);font-weight:700;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chips{display:flex;flex-wrap:wrap;gap:5px}.chip{background:var(--panel);padding:3px 9px;border-radius:99px;font-size:.75rem;font-weight:600;display:flex;align-items:center;gap:5px}
+#mdock{position:fixed;bottom:10px;right:10px;width:250px;background:var(--card);border:2px solid var(--pri);border-radius:12px;box-shadow:0 8px 20px #000a;z-index:1000;overflow:hidden;display:none;flex-direction:column}
+#mdock.vis{display:flex}#mdock.min{width:160px}#mdock.min .mbody{display:none}
+.mhead{background:var(--panel);padding:6px 10px;font-size:.75rem;font-weight:700;display:flex;justify-content:space-between;cursor:pointer}
+.mbody{padding:6px;background:#000;position:relative}
+#svid{width:100%;max-height:140px;border-radius:4px;background:#000}
+#unlock{position:absolute;inset:0;background:#0f172ae6;display:none;flex-direction:column;align-items:center;justify-content:center;padding:8px;text-align:center;gap:6px;z-index:5}#unlock.active{display:flex}
+</style>
+</head>
+<body>
+<canvas id="confetti"></canvas>
+<div id="banner"><h3 id="b-title">🎉 PRIZE WON!</h3><p id="b-sub"></p></div>
+<header>
+  <div class="brand"><span>🎱 TAMBOLA LIVE</span><span id="rbadge" style="font-size:.75rem;color:#fff;background:#3b82f6;padding:2px 7px;border-radius:5px;display:none"></span></div>
+  <div class="badge"><span class="dot" id="ndot"></span><span id="nstat">Ready</span></div>
+</header>
+
+<main id="s-setup" class="screen active">
+  <div class="card" style="display:flex;flex-direction:column;gap:12px;margin:auto 0">
+    <h2 style="text-align:center">Reddy Tambola Live</h2>
+    <p style="text-align:center;color:var(--mut);font-size:.82rem">20 Players • Auto-Claim Prizes • Audio/Video Sync</p>
+    <div><label style="font-size:.75rem;color:var(--mut);font-weight:700">YOUR NAME</label><input type="text" id="in-name" placeholder="Enter your name" maxlength="16" style="margin-top:4px"/></div>
+    <div><label style="font-size:.75rem;color:var(--mut);font-weight:700">ROOM CODE</label>
+      <div class="row" style="margin-top:4px"><input type="text" id="in-room" placeholder="CODE" maxlength="4" style="text-transform:uppercase;font-weight:800;text-align:center;letter-spacing:2px"/><button id="btn-join" class="btn-pri" style="min-width:110px">Join Game</button></div>
+    </div>
+    <div style="text-align:center;color:var(--mut);font-size:.75rem">— OR —</div>
+    <button id="btn-host" class="btn-acc">👑 Create Room as Host (20 Players)</button>
+  </div>
+</main>
+
+<main id="s-host" class="screen">
+  <div class="card">
+    <div class="title"><span>Room: <strong id="h-code" style="color:var(--acc);font-size:1rem">----</strong></span><span id="h-cnt">0 / 20 Players</span></div>
+    <div class="row" style="margin-bottom:8px"><button id="btn-copy" class="btn-pri btn-sm grow">🔗 Copy Invite Link</button><button id="btn-hgrid" class="btn-out btn-sm">1-90 Grid</button></div>
+    <div class="chips" id="h-players"><span style="font-size:.78rem;color:var(--mut)">Waiting for players...</span></div>
+  </div>
+  <div class="caller">
+    <div class="ball" id="h-ball">--</div>
+    <div style="flex:1;margin-left:12px"><div style="font-size:.72rem;color:var(--mut);font-weight:700">CALLED: <span id="h-ccnt">0</span>/90</div><div class="recent" id="h-rec"></div></div>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <button id="btn-call" class="btn-acc">Call Next</button>
+      <select id="sel-auto" style="min-height:32px;padding:2px 6px;font-size:.75rem"><option value="0">Auto: OFF</option><option value="5000">Auto: 5s</option><option value="8000">Auto: 8s</option></select>
+    </div>
+  </div>
+  <div class="card" id="h-bcard" style="display:none"><div class="title">1–90 Board</div><div class="bgrid" id="h-bgrid"></div></div>
+  <div class="card">
+    <div class="title"><span>🎬 Custom Audio / Video Sync</span></div>
+    <div class="row" style="margin-bottom:6px"><input type="url" id="in-url" placeholder="Direct .mp4 / .mp3 URL" style="min-height:36px;font-size:.8rem"/><button id="btn-url" class="btn-pri btn-sm">Load</button></div>
+    <div class="row" style="margin-bottom:8px"><label class="btn-out btn-sm grow" style="text-align:center;cursor:pointer;border-radius:8px;padding:6px">📂 Upload Local Video/Audio<input type="file" id="in-file" accept="audio/*,video/*" style="display:none"/></label></div>
+    <div class="row"><button id="btn-play" class="btn-ok btn-sm grow">▶ Play</button><button id="btn-pause" class="btn-out btn-sm grow">⏸ Pause</button><button id="btn-sync" class="btn-out btn-sm">🔄 Sync</button></div>
+  </div>
+  <div class="card"><div class="title"><span>🏆 Auto-Verified Prizes</span><span style="color:var(--ok)">Live</span></div><div class="pgrid" id="h-pgrid"></div></div>
+</main>
+
+<main id="s-player" class="screen">
+  <div class="caller">
+    <div class="ball" id="p-ball">--</div>
+    <div style="flex:1;margin-left:12px"><div class="row" style="justify-content:space-between"><span style="font-size:.72rem;color:var(--mut);font-weight:700">LAST CALLED</span><span id="p-ccnt" style="font-size:.72rem;color:var(--acc);font-weight:700">0/90</span></div><div class="recent" id="p-rec"></div></div>
+  </div>
+  <div class="twrap"><div class="thead"><span id="t-name">TICKET</span><span style="font-size:.7rem;color:#475569">Auto-Claim Active ⚡</span></div><div class="tgrid" id="p-tgrid"></div></div>
+  <div class="card"><div class="title"><span>🏆 Live Winners Board</span><button id="btn-pgrid" class="btn-out btn-sm" style="min-height:26px;padding:2px 8px">1-90 Board</button></div><div class="pgrid" id="p-pgrid"></div></div>
+  <div class="card" id="p-bcard" style="display:none"><div class="title">1–90 Called Numbers</div><div class="bgrid" id="p-bgrid"></div></div>
+</main>
+
+<div id="mdock">
+  <div class="mhead" id="mhead"><span>📺 Live Media</span><span>━</span></div>
+  <div class="mbody"><video id="svid" playsinline></video><div id="unlock"><p style="font-size:.75rem;font-weight:700">Host started media</p><button id="btn-unlk" class="btn-acc btn-sm">🔊 Enable Audio/Video</button></div></div>
+</div>
+
+<script>
+const PRIZES=[{id:'early5',name:'Early 5',icon:'⚡'},{id:'topLine',name:'Top Line',icon:'⬆️'},{id:'middleLine',name:'Middle Line',icon:'↔️'},{id:'bottomLine',name:'Bottom Line',icon:'⬇️'},{id:'fourCorners',name:'Four Corners',icon:'四角'},{id:'fullHouse',name:'Full House',icon:'👑'}];
+const st={role:null,code:'',name:'',peer:null,hconn:null,peers:new Map(),called:[],curr:null,prizes:{},ticket:null,dab:new Set(),timer:null,stream:null};
+PRIZES.forEach(p=>st.prizes[p.id]={won:false,winner:null,num:null});
+const $=id=>document.getElementById(id);
+
+function genTicket(){
+  const ranges=[[1,9],[10,19],[20,29],[30,39],[40,49],[50,59],[60,69],[70,79],[80,90]];
+  let mask,ok=false;
+  while(!ok){
+    mask=[[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0]];
+    const cc=Array(9).fill(1);let rem=6;
+    while(rem>0){const c=Math.floor(Math.random()*9);if(cc[c]<3){cc[c]++;rem--;}}
+    const rc=[0,0,0],ord=[0,1,2,3,4,5,6,7,8].sort((a,b)=>cc[b]-cc[a]);
+    let p=true;
+    for(const c of ord){
+      const av=[0,1,2].filter(r=>rc[r]<5).sort(()=>Math.random()-.5);
+      if(av.length<cc[c]){p=false;break;}
+      for(let i=0;i<cc[c];i++){mask[av[i]][c]=1;rc[av[i]]++;}
+    }
+    if(p&&rc[0]===5&&rc[1]===5&&rc[2]===5)ok=true;
+  }
+  const t=[[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0]];
+  for(let c=0;c<9;c++){
+    const cnt=mask[0][c]+mask[1][c]+mask[2][c],[min,max]=ranges[c],pool=[];
+    for(let n=min;n<=max;n++)pool.push(n);
+    const pick=pool.sort(()=>Math.random()-.5).slice(0,cnt).sort((a,b)=>a-b);
+    let idx=0;for(let r=0;r<3;r++)if(mask[r][c])t[r][c]=pick[idx++];
+  }
+  return t;
+}
+
+function evalPrizes(t,cset){
+  if(!t)return[];
+  const r=[t[0].filter(n=>n>0),t[1].filter(n=>n>0),t[2].filter(n=>n>0)],all=[...r[0],...r[1],...r[2]];
+  const m=all.filter(n=>cset.has(n)).length,res=[];
+  if(m>=5)res.push('early5');
+  if(r[0].every(n=>cset.has(n)))res.push('topLine');
+  if(r[1].every(n=>cset.has(n)))res.push('middleLine');
+  if(r[2].every(n=>cset.has(n)))res.push('bottomLine');
+  if([r[0][0],r[0][4],r[2][0],r[2][4]].every(n=>cset.has(n)))res.push('fourCorners');
+  if(m===15)res.push('fullHouse');
+  return res;
+}
+
+function renderUI(){
+  const cset=new Set(st.called);
+  for(let i=1;i<=90;i++){
+    const cls='bcell'+(cset.has(i)?' called':'')+(i===st.curr?' latest':'');
+    if($('hc-'+i))$('hc-'+i).className=cls;
+    if($('pc-'+i))$('pc-'+i).className=cls;
+  }
+  const rec=st.called.slice(-6,-1).reverse().map(n=>`<div class="mball">${n}</div>`).join('');
+  if(st.role==='host'){
+    $('h-ball').textContent=st.curr||'--';$('h-ccnt').textContent=st.called.length;$('h-rec').innerHTML=rec;
+  }else{
+    $('p-ball').textContent=st.curr||'--';$('p-ccnt').textContent=st.called.length+'/90';$('p-rec').innerHTML=rec;
+    renderTicket();
+  }
+  const phtml=PRIZES.map(c=>{const p=st.prizes[c.id];return `<div class="pcard ${p.won?'won':''}"><div class="pname"><span>${c.icon} ${c.name}</span>${p.won?'<span>✔</span>':''}</div><div class="pwin">${p.won?`🏆 ${p.winner} (#${p.num})`:'Unclaimed'}</div></div>`;}).join('');
+  $('h-pgrid').innerHTML=phtml;$('p-pgrid').innerHTML=phtml;
+}
+
+function renderTicket(){
+  if(!st.ticket)return;
+  const g=$('p-tgrid');g.innerHTML='';const cset=new Set(st.called);
+  for(let r=0;r<3;r++)for(let c=0;c<9;c++){
+    const n=st.ticket[r][c],el=document.createElement('div');
+    if(!n)el.className='tcell empty';
+    else{
+      const dab=st.dab.has(n),cal=cset.has(n);
+      el.className='tcell'+(dab?' dab':'')+(cal&&!dab?' hint':'');el.textContent=n;
+      el.onclick=()=>{if(!cset.has(n))return;st.dab.has(n)?st.dab.delete(n):st.dab.add(n);renderTicket();};
+    }
+    g.appendChild(el);
+  }
+}
+
+function celebrate(pname,winner,num){
+  $('b-title').textContent=`🎉 ${winner} Won ${pname}!`;$('b-sub').textContent=`Verified on Call #${num}`;
+  $('banner').classList.add('active');setTimeout(()=>$('banner').classList.remove('active'),4200);
+  try{const ctx=new(window.AudioContext||window.webkitAudioContext)();[523,659,784,1046].forEach((f,i)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=f;g.gain.setValueAtTime(.15,ctx.currentTime+i*.1);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+i*.1+.3);o.connect(g);g.connect(ctx.destination);o.start(ctx.currentTime+i*.1);o.stop(ctx.currentTime+i*.1+.3);});}catch(e){}
+}
+
+function bcast(msg){st.peers.forEach(p=>p.conn&&p.conn.open&&p.conn.send(msg));}
+
+function checkHostPrizes(){
+  const cset=new Set(st.called);
+  st.peers.forEach(p=>{
+    evalPrizes(p.ticket,cset).forEach(pid=>{
+      const pr=st.prizes[pid];
+      if(pr&&!pr.won){
+        pr.won=true;pr.winner=p.name;pr.num=st.curr||0;
+        const pname=PRIZES.find(x=>x.id===pid).name;
+        renderUI();celebrate(pname,p.name,pr.num);
+        bcast({type:'AWARD',pname,winner:p.name,num:pr.num,prizes:st.prizes});
+      }
+    });
+  });
+}
+
+$('btn-host').onclick=()=>{
+  st.role='host';st.name=$('in-name').value.trim()||'Host';
+  st.code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
+  st.peer=new Peer('TAMBOLA_26_'+st.code);
+  st.peer.on('open',()=>{
+    $('nstat').textContent='Host ('+st.code+')';$('ndot').classList.add('online');$('h-code').textContent=st.code;$('rbadge').style.display='inline';$('rbadge').textContent=st.code;
+    $('s-setup').classList.remove('active');$('s-host').classList.add('active');renderUI();
+  });
+  st.peer.on('connection',conn=>{
+    if(st.peers.size>=20)return;
+    conn.on('data',d=>{
+      if(d.type==='JOIN'){
+        st.peers.set(conn.peer,{conn,name:d.name,ticket:d.ticket});
+        conn.send({type:'SYNC',called:st.called,curr:st.curr,prizes:st.prizes,media:mState()});
+        if(st.stream)st.peer.call(conn.peer,st.stream);
+        updLobby();checkHostPrizes();
+      }
+    });
+    conn.on('close',()=>{st.peers.delete(conn.peer);updLobby();});
+  });
+};
+
+function updLobby(){
+  $('h-cnt').textContent=st.peers.size+' / 20 Players';$('h-players').innerHTML=Array.from(st.peers.values()).map(p=>`<div class="chip"><span class="dot online"></span>${p.name}</div>`).join('')||'<span style="font-size:.78rem;color:var(--mut)">Waiting...</span>';
+}
+
+$('btn-join').onclick=()=>{
+  const code=$('in-room').value.trim().toUpperCase();if(code.length!==4)return alert('Enter 4-letter Room Code');
+  st.role='player';st.name=$('in-name').value.trim()||'Player';st.code=code;st.ticket=genTicket();
+  st.peer=new Peer();
+  st.peer.on('open',()=>{
+    const conn=st.peer.connect('TAMBOLA_26_'+code,{reliable:true});st.hconn=conn;
+    conn.on('open',()=>{
+      $('nstat').textContent='Connected';$('ndot').classList.add('online');$('rbadge').style.display='inline';$('rbadge').textContent=code;$('t-name').textContent=st.name.toUpperCase()+"'S TICKET";
+      conn.send({type:'JOIN',name:st.name,ticket:st.ticket});
+      $('s-setup').classList.remove('active');$('s-player').classList.add('active');renderUI();
+    });
+    conn.on('data',d=>{
+      if(d.type==='SYNC'){st.called=d.called;st.curr=d.curr;st.prizes=d.prizes;st.called.forEach(n=>st.dab.add(n));renderUI();if(d.media&&d.media.url)syncMedia(d.media);}
+      if(d.type==='CALL'){st.curr=d.num;st.called=d.called;st.dab.add(d.num);renderUI();}
+      if(d.type==='AWARD'){st.prizes=d.prizes;renderUI();celebrate(d.pname,d.winner,d.num);}
+      if(d.type==='MEDIA')syncMedia(d);
+    });
+  });
+  st.peer.on('call',call=>{call.answer();call.on('stream',s=>{$('mdock').classList.add('vis');$('svid').srcObject=s;playVid();});});
+};
+
+function callNext(){
+  if(st.called.length>=90)return;
+  const cset=new Set(st.called),rem=[];for(let i=1;i<=90;i++)if(!cset.has(i))rem.push(i);
+  const next=rem[Math.floor(Math.random()*rem.length)];
+  st.called.push(next);st.curr=next;renderUI();
+  bcast({type:'CALL',num:next,called:st.called});checkHostPrizes();
+}
+$('btn-call').onclick=callNext;
+$('sel-auto').onchange=e=>{clearInterval(st.timer);const ms=+e.target.value;if(ms){callNext();st.timer=setInterval(callNext,ms);}};$('btn-copy').onclick=()=>{navigator.clipboard.writeText(location.origin+location.pathname+'?room='+st.code);$('btn-copy').textContent='✅ Copied!';setTimeout(()=>$('btn-copy').textContent='🔗 Copy Invite Link',2000);};
+$('btn-hgrid').onclick=()=>$('h-bcard').style.display=$('h-bcard').style.display==='none'?'block':'none';$('btn-pgrid').onclick=()=>$('p-bcard').style.display=$('p-bcard').style.display==='none'?'block':'none';
+
+const svid=$('svid');
+function mState(){return{type:'MEDIA',url:svid.dataset.url||'',play:!svid.paused,time:svid.currentTime||0};}
+function playVid(){svid.play().then(()=>$('unlock').classList.remove('active')).catch(()=>$('unlock').classList.add('active'));}
+function syncMedia(m){
+  $('mdock').classList.add('vis');
+  if(m.url&&svid.dataset.url!==m.url){svid.srcObject=null;svid.src=m.url;svid.dataset.url=m.url;}
+  if(Math.abs(svid.currentTime-m.time)>.8)svid.currentTime=m.time;
+  m.play?playVid():svid.pause();
+}
+$('btn-url').onclick=()=>{const u=$('in-url').value.trim();if(!u)return;st.stream=null;svid.srcObject=null;svid.src=u;svid.dataset.url=u;$('mdock').classList.add('vis');playVid();setTimeout(()=>bcast(mState()),200);};
+$('in-file').onchange=e=>{const f=e.target.files[0];if(!f)return;svid.srcObject=null;svid.src=URL.createObjectURL(f);svid.dataset.url='';$('mdock').classList.add('vis');svid.onloadedmetadata=()=>{playVid();const s=svid.captureStream?svid.captureStream():null;if(s){st.stream=s;st.peers.forEach((_,id)=>st.peer.call(id,s));}};};
+$('btn-play').onclick=()=>{playVid();bcast(mState());};$('btn-pause').onclick=()=>{svid.pause();bcast(mState());};
+$('btn-sync').onclick=()=>bcast(mState());$('btn-unlk').onclick=()=>{svid.muted=false;playVid();};
+$('mhead').onclick=()=>$('mdock').classList.toggle('min');
+
+window.onload=()=>{
+  for(let i=1;i<=90;i++){$('h-bgrid').innerHTML+=`<div class="bcell" id="hc-${i}">${i}</div>`;$('p-bgrid').innerHTML+=`<div class="bcell" id="pc-${i}">${i}</div>`;}
+  renderUI();
+  const r=new URLSearchParams(location.search).get('room');if(r)$('in-room').value=r.toUpperCase().slice(0,4);
+};
+</script>
+</body>
+</html>
