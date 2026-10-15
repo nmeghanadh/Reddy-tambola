@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+<meta name="referrer" content="strict-origin-when-cross-origin" />
 <title>Tambola Live - 50 Player</title>
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-<script src="https://www.youtube.com/iframe_api"></script>
 <style>
 :root{--bg:#0f172a;--card:#1e293b;--panel:#334155;--acc:#f59e0b;--pri:#3b82f6;--ok:#10b981;--txt:#f8fafc;--mut:#94a3b8;--brd:#475569}
 *{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-user-select:none;touch-action:manipulation}
@@ -57,13 +57,13 @@ input[type=text],input[type=url],select{width:100%;min-height:42px;padding:8px 1
 .pname{font-size:.76rem;font-weight:700;display:flex;justify-content:space-between}
 .pwin{font-size:.72rem;color:var(--acc);font-weight:700;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chips{display:flex;flex-wrap:wrap;gap:5px;max-height:90px;overflow-y:auto}.chip{background:var(--panel);padding:3px 8px;border-radius:99px;font-size:.74rem;font-weight:600;display:flex;align-items:center;gap:4px}
-#mdock{position:fixed;bottom:10px;right:10px;width:250px;background:var(--card);border:2px solid var(--pri);border-radius:12px;box-shadow:0 8px 20px #000a;z-index:1000;overflow:hidden;display:none;flex-direction:column}
+#mdock{position:fixed;bottom:10px;right:10px;width:270px;background:var(--card);border:2px solid var(--pri);border-radius:12px;box-shadow:0 8px 20px #000a;z-index:1000;overflow:hidden;display:none;flex-direction:column}
 #mdock.vis{display:flex}#mdock.min{width:140px}#mdock.min .mbody{display:none}
 .mhead{background:var(--panel);padding:6px 10px;font-size:.74rem;font-weight:700;display:flex;justify-content:space-between;cursor:pointer}
-.mbody{padding:5px;background:#000;position:relative;min-height:140px;display:flex;align-items:center;justify-content:center}
-#svid,#yt-wrap{width:100%;height:140px;border-radius:4px;background:#000}#yt-wrap{display:none}
+.mbody{padding:5px;background:#000;position:relative;height:155px;display:flex;align-items:center;justify-content:center}
+#svid,#yt-frame{width:100%;height:145px;border-radius:4px;background:#000;border:none}
+#yt-frame{display:none}
 #unlock{position:absolute;inset:0;background:#0f172ae6;display:none;flex-direction:column;align-items:center;justify-content:center;padding:8px;text-align:center;gap:6px;z-index:5}#unlock.active{display:flex}
-/* Chat Drawer */
 #chat-drawer{position:fixed;inset:0;background:#0008;z-index:9000;display:none;justify-content:flex-end}
 #chat-drawer.open{display:flex}
 .chat-panel{width:100%;max-width:360px;height:100%;background:var(--card);display:flex;flex-direction:column;border-left:1px solid var(--brd)}
@@ -81,7 +81,6 @@ input[type=text],input[type=url],select{width:100%;min-height:42px;padding:8px 1
 <canvas id="fx-canvas"></canvas>
 <div id="float-zone"></div>
 
-<!-- Celebratory Winner Modal -->
 <div id="win-modal">
   <div class="win-box" id="win-box">
     <div class="win-icon" id="win-icon">🏆</div>
@@ -147,7 +146,6 @@ input[type=text],input[type=url],select{width:100%;min-height:42px;padding:8px 1
   <div class="card" id="p-bcard" style="display:none"><div class="title">1–90 Called Numbers</div><div class="bgrid" id="p-bgrid"></div></div>
 </main>
 
-<!-- Live Chat Drawer -->
 <div id="chat-drawer">
   <div class="chat-panel">
     <div class="chat-head"><span>💬 Live Room Chat</span><button class="btn-out btn-sm" id="btn-chat-close">✕</button></div>
@@ -167,16 +165,14 @@ input[type=text],input[type=url],select{width:100%;min-height:42px;padding:8px 1
   </div>
 </div>
 
-<!-- Media Dock -->
 <div id="mdock">
   <div class="mhead" id="mhead"><span>📺 Live Media</span><span>━</span></div>
   <div class="mbody">
     <video id="svid" playsinline controls></video>
-    <div id="yt-wrap"><div id="yt-player"></div></div>
+    <iframe id="yt-frame" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
     <div id="unlock"><p style="font-size:.75rem;font-weight:700">Host started media</p><button id="btn-unlk" class="btn-acc btn-sm">🔊 Tap to Hear Audio</button></div>
   </div>
 </div>
-
 <script>
 const MAX_PLAYERS=50;
 const PEER_CFG={config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'stun:stun2.l.google.com:19302'}]}};
@@ -185,16 +181,30 @@ const st={role:null,code:'',name:'',peer:null,hconn:null,peers:new Map(),called:
 PRIZES.forEach(p=>st.prizes[p.id]={won:false,winner:null,num:null});
 const $=id=>document.getElementById(id);
 
-let ytPlayer=null,ytReady=false,pendingYt=null;
-function onYouTubeIframeAPIReady(){
-  ytPlayer=new YT.Player('yt-player',{height:'140',width:'100%',playerVars:{playsinline:1,controls:1,rel:0},events:{onReady:()=>{ytReady=true;if(pendingYt)loadYtVideo(pendingYt.id,pendingYt.time,pendingYt.play);}}});
+function extractYtId(u){
+  const m=u.match(/(?:youtu\.be\/|youtube\.com\/(?:.*v=|.*\/|embed\/|shorts\/|live\/))([^"&?\/\s]{11})/);
+  return m?m[1]:null;
 }
-function extractYtId(u){const m=u.match(/(?:youtu\.be\/|youtube\.com\/(?:.*v=|.*\/|embed\/|shorts\/))([^"&?\/\s]{11})/);return m?m[1]:null;}
-function loadYtVideo(id,time=0,play=true){
-  st.mMode='yt';st.ytId=id;st.ytPlaying=play;$('mdock').classList.add('vis');$('svid').pause();$('svid').style.display='none';$('yt-wrap').style.display='block';
-  if(!ytReady||!ytPlayer||!ytPlayer.loadVideoById){pendingYt={id,time,play};return;}
-  ytPlayer.loadVideoById({videoId:id,startSeconds:time||0});
-  if(play){ytPlayer.unMute();ytPlayer.setVolume(100);ytPlayer.playVideo();if(st.role==='player')$('unlock').classList.add('active');}else ytPlayer.pauseVideo();
+
+function ytCmd(func,args=[]){
+  const f=$('yt-frame');
+  if(f&&f.contentWindow)f.contentWindow.postMessage(JSON.stringify({event:'command',func,args}),'*');
+}
+
+function mountYtIframe(id,play=true){
+  st.mMode='yt';st.ytId=id;st.ytPlaying=play;
+  $('mdock').classList.add('vis');
+  $('svid').pause();$('svid').style.display='none';
+  const yf=$('yt-frame');
+  yf.style.display='block';
+  const targetSrc=`https://www.youtube.com/embed/${id}?enablejsapi=1&autoplay=${play?1:0}&playsinline=1&rel=0`;
+  if(yf.dataset.vid!==id){
+    yf.dataset.vid=id;
+    yf.src=targetSrc;
+  }else{
+    ytCmd(play?'playVideo':'pauseVideo');
+  }
+  if(st.role==='player'&&play)$('unlock').classList.add('active');
 }
 
 function genTicket(){
@@ -281,7 +291,6 @@ function checkPlayerAutoClaim(){
   });
 }
 
-/* Fireworks & Celebration Engine */
 function celebrate(pname,winner,num,pid){
   const isFH=(pid==='fullHouse'||pname==='Full House');
   const box=$('win-box');
@@ -302,7 +311,7 @@ function celebrate(pname,winner,num,pid){
 
 function launchFireworks(totalFrames){
   const cv=$('fx-canvas'),ctx=cv.getContext('2d');
-  cv.width= innerWidth;cv.height=innerHeight;
+  cv.width=innerWidth;cv.height=innerHeight;
   let parts=[];
   function burst(){
     const cx=Math.random()*cv.width,cy=Math.random()*(cv.height*0.55);
@@ -327,12 +336,10 @@ function launchFireworks(totalFrames){
   requestAnimationFrame(loop);
 }
 
-/* Live Chat Engine */
 function receiveChat(sender,text){
   const box=$('chat-msgs'),d=document.createElement('div');
   d.className='cmsg';d.innerHTML=`<b>${sender}</b>${text}`;
   box.appendChild(d);box.scrollTop=box.scrollHeight;
-  // Floating pill on screen
   const fz=$('float-zone'),fl=document.createElement('div');
   fl.className='float-msg';fl.textContent=`${sender}: ${text}`;
   fz.appendChild(fl);setTimeout(()=>fl.remove(),3200);
@@ -417,7 +424,7 @@ function connectToHost(code){
     if(d.type==='MEDIA')syncMedia(d);
     if(d.type==='FILE_BLOB'){
       st.mMode='file';$('mdock').classList.add('vis');
-      $('yt-wrap').style.display='none';if(ytReady&&ytPlayer&&ytPlayer.pauseVideo)ytPlayer.pauseVideo();$('svid').style.display='block';
+      $('yt-frame').style.display='none';$('yt-frame').src='';$('yt-frame').dataset.vid='';$('svid').style.display='block';
       const blob=new Blob([d.buf],{type:d.mime||'video/mp4'});
       svid.srcObject=null;svid.src=URL.createObjectURL(blob);svid.dataset.url='local_blob';
       svid.currentTime=d.time||0;if(d.play)playVid();
@@ -457,22 +464,29 @@ $('btn-hgrid').onclick=()=>$('h-bcard').style.display=$('h-bcard').style.display
 
 const svid=$('svid');
 function mState(){
-  if(st.mMode==='yt')return{type:'MEDIA',mode:'yt',ytId:st.ytId,play:st.ytPlaying,time:(ytReady&&ytPlayer&&ytPlayer.getCurrentTime)?ytPlayer.getCurrentTime():0};
+  if(st.mMode==='yt')return{type:'MEDIA',mode:'yt',ytId:st.ytId,play:st.ytPlaying};
   return{type:'MEDIA',mode:st.mMode,url:svid.dataset.url||'',play:!svid.paused,time:svid.currentTime||0};
 }
 function playVid(){
-  if(st.mMode==='yt'){st.ytPlaying=true;if(ytReady&&ytPlayer&&ytPlayer.playVideo){ytPlayer.unMute();ytPlayer.setVolume(100);ytPlayer.playVideo();}$('unlock').classList.remove('active');return;}
+  if(st.mMode==='yt'){
+    st.ytPlaying=true;
+    ytCmd('unMute');ytCmd('setVolume',[100]);ytCmd('playVideo');
+    $('unlock').classList.remove('active');
+    return;
+  }
   svid.muted=false;svid.play().then(()=>$('unlock').classList.remove('active')).catch(()=>$('unlock').classList.add('active'));
 }
-function pauseVid(){if(st.mMode==='yt'){st.ytPlaying=false;if(ytReady&&ytPlayer&&ytPlayer.pauseVideo)ytPlayer.pauseVideo();return;}svid.pause();}
+function pauseVid(){
+  if(st.mMode==='yt'){st.ytPlaying=false;ytCmd('pauseVideo');return;}
+  svid.pause();
+}
 function syncMedia(m){
   $('mdock').classList.add('vis');
   if(m.mode==='yt'&&m.ytId){
-    if(st.ytId!==m.ytId||st.mMode!=='yt')loadYtVideo(m.ytId,m.time||0,m.play);
-    else if(ytReady&&ytPlayer&&ytPlayer.seekTo){if(Math.abs((ytPlayer.getCurrentTime()||0)-(m.time||0))>1.5)ytPlayer.seekTo(m.time||0,true);m.play?ytPlayer.playVideo():ytPlayer.pauseVideo();}
+    mountYtIframe(m.ytId,m.play);
     return;
   }
-  $('yt-wrap').style.display='none';if(ytReady&&ytPlayer&&ytPlayer.pauseVideo)ytPlayer.pauseVideo();$('svid').style.display='block';
+  $('yt-frame').style.display='none';$('yt-frame').src='';$('yt-frame').dataset.vid='';$('svid').style.display='block';
   if(m.url&&m.url!=='local_blob'&&svid.dataset.url!==m.url){svid.srcObject=null;svid.src=m.url;svid.dataset.url=m.url;}
   if(Math.abs((svid.currentTime||0)-(m.time||0))>.8)svid.currentTime=m.time||0;
   m.play?playVid():svid.pause();
@@ -480,12 +494,21 @@ function syncMedia(m){
 $('btn-url').onclick=()=>{
   const u=$('in-url').value.trim();if(!u)return;
   const ytId=extractYtId(u);
-  if(ytId){st.fileBuf=null;loadYtVideo(ytId,0,true);$('m-status').textContent='YouTube Synced ✅';setTimeout(()=>bcast(mState()),400);return;}
-  st.mMode='url';st.fileBuf=null;$('yt-wrap').style.display='none';if(ytReady&&ytPlayer&&ytPlayer.pauseVideo)ytPlayer.pauseVideo();$('svid').style.display='block';svid.srcObject=null;svid.src=u;svid.dataset.url=u;$('mdock').classList.add('vis');playVid();$('m-status').textContent='URL Synced ✅';setTimeout(()=>bcast(mState()),250);
+  if(ytId){
+    st.fileBuf=null;
+    mountYtIframe(ytId,true);
+    $('m-status').textContent='YouTube Loaded ✅';
+    bcast(mState());
+    return;
+  }
+  st.mMode='url';st.fileBuf=null;
+  $('yt-frame').style.display='none';$('yt-frame').src='';$('yt-frame').dataset.vid='';$('svid').style.display='block';svid.srcObject=null;svid.src=u;svid.dataset.url=u;
+  $('mdock').classList.add('vis');playVid();$('m-status').textContent='URL Synced ✅';
+  setTimeout(()=>bcast(mState()),250);
 };
 $('in-file').onchange=e=>{
   const f=e.target.files[0];if(!f)return;
-  st.mMode='file';$('m-status').textContent='Sending file...';$('yt-wrap').style.display='none';if(ytReady&&ytPlayer&&ytPlayer.pauseVideo)ytPlayer.pauseVideo();
+  st.mMode='file';$('m-status').textContent='Sending file...';$('yt-frame').style.display='none';$('yt-frame').src='';$('yt-frame').dataset.vid='';
   $('svid').style.display='block';svid.srcObject=null;svid.src=URL.createObjectURL(f);svid.dataset.url='local_blob';$('mdock').classList.add('vis');playVid();
   const reader=new FileReader();
   reader.onload=ev=>{st.fileBuf=ev.target.result;st.fileMime=f.type||'video/mp4';st.peers.forEach(p=>sendFileToPeer(p.conn));$('m-status').textContent='File Synced ✅';};
